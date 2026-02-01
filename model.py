@@ -213,7 +213,7 @@ def data_generator(
                     aug_img, aug_segmap = seq(image=uint8_img, segmentation_maps=segmap)
                     img = aug_img.astype(np.float32) # uint8 [0, 255] -> float32 [0,1] (convert back for model)
                     
-                    mask = np.expand_dims(aug_segmap.get_arr(), axis=-1).astype(np.float32) / 255.0
+                    mask = np.expand_dims(aug_segmap.get_arr(), axis=-1).astype(np.float32) 
 
                     
                     # mask_to_encode = aug_segmap.get_arr() # SegmentationMapsOnImage obj -> arr
