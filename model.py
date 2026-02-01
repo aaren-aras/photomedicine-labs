@@ -46,7 +46,7 @@ if physical_devices:
         print('*WARNING: CUDA or cuDNN version information unavailable. Verify your TensorFlow GPU setup...')
 
 
-def dice_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, smooth: float=EPSILON*100) -> tf.Tensor: 
+def dice_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, smooth: float=1.0) -> tf.Tensor: 
     """
     Compute the Dice coefficient between two tensors (ground truth and prediction masks), ranging from 0 (no overlap) to 1 (perfect match).
     """
@@ -211,7 +211,7 @@ def data_generator(
 
                     # Apply augmentation pipeline to both image and mask
                     aug_img, aug_segmap = seq(image=uint8_img, segmentation_maps=segmap)
-                    img = aug_img.astype(np.float32) / 255.0 # uint8 [0, 255] -> float32 [0,1] (convert back for model)
+                    img = aug_img.astype(np.float32) # uint8 [0, 255] -> float32 [0,1] (convert back for model)
                     
                     mask = np.expand_dims(aug_segmap.get_arr(), axis=-1).astype(np.float32) / 255.0
 

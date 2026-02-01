@@ -25,7 +25,7 @@ def process_sample(id: str, label: str, binarize_mask=bool) -> tuple[np.ndarray,
     """
     Normalize projection maps and binarize segmentation masks. 
     """
-    img = np.array(Image.open(INPUT_DIR / 'OCTA(ILM_OPL)' / id).convert('L')) / 255.0 # .bmp -> np arr
+    img = np.array(Image.open(INPUT_DIR / 'OCTA(ILM_OPL)' / id).convert('L')).astype(np.uint8) # .bmp -> np arr
     mask = np.array(Image.open(INPUT_DIR / 'Label' / label / id).convert('L')) # .bmp -> np arr
     mask = (mask > 0).astype(np.uint8) if binarize_mask else mask
     return img, mask, id
