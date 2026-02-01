@@ -13,8 +13,7 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 
-from .data import IMG_DIR, MASK_DIR
-from .config import (
+from config import (
     IMG_SIZE, MODALITIES, NUM_CLASSES, FILTERS, KERNEL_SIZE, SCALE_FACTOR, 
     DROPOUT_RATE, LEARNING_RATE, EPSILON, BATCH_SIZE, AUG_CONFIG, EPOCHS
 )
@@ -214,6 +213,7 @@ def data_generator(
                     # mask_to_encode = np.clip(mask_to_encode, 0, num_classes=-1)
                 
                 batch_imgs.append(img)
+                batch_masks.append(mask)
 
             yield np.array(batch_imgs), np.array(batch_masks)
 
@@ -227,10 +227,10 @@ def train_model() -> None:
     MODELS_DIR.mkdir(exist_ok=True)
 
     # Define subsubdirectories from 'data.py'
-    IMG_TRAIN_DIR = IMG_DIR / 'train'
-    MASK_TRAIN_DIR = MASK_DIR / 'train'
-    IMG_VALID_DIR = IMG_DIR / 'valid'
-    MASK_VALID_DIR = MASK_DIR / 'valid'
+    IMG_TRAIN_DIR = OUTPUT_DIR / 'images' / 'train'
+    IMG_VALID_DIR = OUTPUT_DIR / 'valid'
+    MASK_TRAIN_DIR = OUTPUT_DIR / 'masks' / 'train'
+    MASK_VALID_DIR = OUTPUT_DIR / 'masks' / 'valid'
 
     # Initialize data generators for one-hot encoding and augmentation during model.fit()
     train_gen = data_generator(IMG_TRAIN_DIR, MASK_TRAIN_DIR, augment=True)
@@ -257,7 +257,7 @@ def train_model() -> None:
         verbose=1
     )
 
-    model.save(Path(MODELS_DIR / 'oncer_model.keras'))
+    model.save(Path(MODELS_DIR / 'octa_model.keras'))
     print(f"*COMPLETE: model has been trained and saved to 'models' folder")
 
 
