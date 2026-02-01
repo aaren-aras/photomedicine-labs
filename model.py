@@ -230,7 +230,7 @@ def train_model() -> None:
     Train a 2D U-Net segmentation model on BraTS data and save it for later inference.
     """
     model = build_segmentation_model()
-    MODELS_DIR = Path(__file__).resolve().parent.parent / 'models' # oncer/api/models
+    MODELS_DIR = Path(__file__).resolve() / 'models' 
     MODELS_DIR.mkdir(exist_ok=True)
 
     # Define subsubdirectories from 'data.py'
@@ -249,7 +249,7 @@ def train_model() -> None:
 
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=1),
-        ModelCheckpoint(Path(MODELS_DIR / 'oncer_model_checkpoint.keras'), monitor='val_loss', save_best_only=True, verbose=1),
+        ModelCheckpoint(Path(MODELS_DIR / 'octa_model_checkpoint.keras'), monitor='val_loss', save_best_only=True, verbose=1),
         TensorBoard(log_dir=Path(MODELS_DIR / 'logs'))
     ]
 
