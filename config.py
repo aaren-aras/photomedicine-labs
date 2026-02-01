@@ -11,8 +11,8 @@ EPSILON = 1e-8 # avoid dividing by 0
 
 
 IMG_SIZE = (400, 400)
-MODALITIES = ('OCTA') 
-NUM_CLASSES = 2 # bkgd vs. vessel
+MODALITIES = ('OCTA',) 
+NUM_CLASSES = 1 # bkgd vs. vessel
 
 
 FILTERS = (32, 64, 128, 256)

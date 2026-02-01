@@ -18,6 +18,12 @@ from config import (
     DROPOUT_RATE, LEARNING_RATE, EPSILON, BATCH_SIZE, AUG_CONFIG, EPOCHS
 )
 
+SCRIPT_DIR = Path(__file__).resolve().parent 
+
+INPUT_DIR = (SCRIPT_DIR / 'data/OCTA-500').resolve() 
+OUTPUT_DIR = (SCRIPT_DIR / 'data/OCTA-500_processed').resolve()
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 # Use GPU for faster training (if available)
 physical_devices = tf.config.list_physical_devices('GPU')
 print('*AVAILABLE GPUs:', physical_devices)
@@ -44,7 +50,7 @@ def dice_coefficient(y_true: tf.Tensor, y_pred: tf.Tensor, smooth: float=EPSILON
     """
     Compute the Dice coefficient between two tensors (ground truth and prediction masks), ranging from 0 (no overlap) to 1 (perfect match).
     """
-    y_true_f = tf.reshape(y_true, [-1]) # (H, W, 4) -> 1D, i.e., (240, 240, 4) = 240 x 240 x 4 = [2300400] elements
+    y_true_f = tf.reshape(tf.cast(y_true, tf.float32), [-1]) # (H, W, 4) -> 1D, i.e., (240, 240, 4) = 240 x 240 x 4 = [2300400] elements
     y_pred_f = tf.reshape(y_pred, [-1])
     intersection = tf.reduce_sum(y_true_f * y_pred_f) # sum of element-wise product (common 1s between masks)
     return (2. * intersection + smooth) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + smooth) # Dice formula
@@ -206,6 +212,8 @@ def data_generator(
                     # Apply augmentation pipeline to both image and mask
                     aug_img, aug_segmap = seq(image=uint8_img, segmentation_maps=segmap)
                     img = aug_img.astype(np.float32) / 255.0 # uint8 [0, 255] -> float32 [0,1] (convert back for model)
+                    
+                    mask = mask.astype(np.float32) / 255.0
                     mask = np.expand_dims(aug_segmap.get_arr(), axis=-1)
 
                     
@@ -228,7 +236,7 @@ def train_model() -> None:
 
     # Define subsubdirectories from 'data.py'
     IMG_TRAIN_DIR = OUTPUT_DIR / 'images' / 'train'
-    IMG_VALID_DIR = OUTPUT_DIR / 'valid'
+    IMG_VALID_DIR = OUTPUT_DIR / 'images' / 'valid'
     MASK_TRAIN_DIR = OUTPUT_DIR / 'masks' / 'train'
     MASK_VALID_DIR = OUTPUT_DIR / 'masks' / 'valid'
 
