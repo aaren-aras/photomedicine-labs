@@ -1,26 +1,20 @@
-SPLITS = ['train', 'valid', 'test']
+
+
 LABEL = 'GT_LargeVessel'
 BINARIZE_MASK = True
 RANDOM_STATE = 2026
 
 
 
-"""
-data.py
- - Define small constant ε to avoid division-by-0 cases
-"""
 LABEL_MAP = { 0: 'background', 1: 'NCR', 2: 'ED', 3: 'ET' } # 4 -> 3
-MODALITIES = ('OCTA') # CHANGED
-EPSILON = 1e-8
+EPSILON = 1e-8 # avoid dividing by 0
 
 
-"""
-model.py
- - Match image size with default x-y resolution for BraTS scans 
- - Define scale factor for symmetric downsampling (max pooling) and upsampling
-"""
-IMG_SIZE = (224, 224)
-NUM_CLASSES = 1 # CHANGED
+IMG_SIZE = (400, 400)
+MODALITIES = ('OCTA') 
+NUM_CLASSES = 2 # bkgd vs. vessel
+
+
 FILTERS = (32, 64, 128, 256)
 KERNEL_SIZE = 3
 SCALE_FACTOR = 2
