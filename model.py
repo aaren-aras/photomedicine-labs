@@ -197,7 +197,7 @@ def data_generator(
             batch_masks = []
 
             for j in range(i, min(i + batch_size, num_samples)): # avoid going over end of dataset 
-                img = np.load(img_dir / img_files[j]).astype(np.float32) / 255.0 # uint8 [0, 255] -> float32 [0,1]
+                img = np.load(img_dir / img_files[j]).astype(np.float32) # uint8 [0, 255] -> float32 [0,1]
                 mask = np.load(mask_dir / mask_files[j]) # uint8 [0, 255]
 
                 img = np.expand_dims(img, axis=-1)    # (H, W, 1)
