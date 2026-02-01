@@ -1,3 +1,10 @@
+SPLITS = ['train', 'valid', 'test']
+LABEL = 'GT_LargeVessel'
+BINARIZE_MASK = True
+RANDOM_STATE = 2026
+
+
+
 """
 data.py
  - Define small constant ε to avoid division-by-0 cases
