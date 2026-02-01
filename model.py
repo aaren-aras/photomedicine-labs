@@ -214,7 +214,7 @@ def data_generator(
                     img = aug_img.astype(np.float32) # uint8 [0, 255] -> float32 [0,1] (convert back for model)
                     
                     mask = np.expand_dims(aug_segmap.get_arr(), axis=-1).astype(np.float32) 
-                    print("mask unique values:", np.unique(mask))
+                    # print("mask unique values:", np.unique(mask))
 
                     
                     # mask_to_encode = aug_segmap.get_arr() # SegmentationMapsOnImage obj -> arr
