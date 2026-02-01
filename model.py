@@ -232,7 +232,7 @@ def train_model() -> None:
     Train a 2D U-Net segmentation model on BraTS data and save it for later inference.
     """
     model = build_segmentation_model()
-    MODELS_DIR = Path(__file__).resolve() / 'models' 
+    MODELS_DIR = Path(__file__).resolve().parent / 'models' 
     MODELS_DIR.mkdir(exist_ok=True)
 
     # Define subsubdirectories from 'data.py'
