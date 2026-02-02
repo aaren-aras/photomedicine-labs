@@ -38,7 +38,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 MODEL_PATH = SCRIPT_DIR / 'models' / 'octa_model.keras'
 
-INPUT_DIR = SCRIPT_DIR / 'data' / 'OCTA-500_processed' / 'images' / 'test' / '10008.bmp.npy'
+INPUT_DIR = SCRIPT_DIR / 'data' / 'OCTA-500_processed' / 'images' / 'test' / '10051.bmp.npy'
 OUTPUT_DIR = SCRIPT_DIR / 'previews'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
