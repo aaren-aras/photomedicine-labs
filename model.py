@@ -13,6 +13,9 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 
+from tensorflow.keras.regularizers import l2
+
+
 from config import (
     IMG_SIZE, MODALITIES, NUM_CLASSES, FILTERS, KERNEL_SIZE, SCALE_FACTOR, 
     DROPOUT_RATE, LEARNING_RATE, EPSILON, BATCH_SIZE, AUG_CONFIG, EPOCHS
@@ -20,7 +23,6 @@ from config import (
 
 SCRIPT_DIR = Path(__file__).resolve().parent 
 
-INPUT_DIR = (SCRIPT_DIR / 'data/OCTA-500').resolve() 
 OUTPUT_DIR = (SCRIPT_DIR / 'data/OCTA-500_processed').resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -74,7 +76,8 @@ class DiceMetric(tf.keras.metrics.Metric):
         """
         Update the state with current batch's Dice score.
         """
-        dice = dice_coefficient(y_true, y_pred)
+        y_pred_bin = tf.cast(y_pred > 0.5, tf.float32)  # <-- threshold here
+        dice = dice_coefficient(y_true, y_pred_bin)
         self.dice.assign_add(dice)
         self.count.assign_add(1.0)
 
@@ -99,11 +102,11 @@ def residual_block(x: tf.Tensor, filters: int, kernel_size: int=KERNEL_SIZE) -> 
     """
     shortcut = x
 
-    x = layers.Conv2D(filters, kernel_size, padding='same', activation=None)(x) # capture spatial features with sliding window 
+    x = layers.Conv2D(filters, kernel_size, padding='same', kernel_regularizer=l2(1e-4), activation=None)(x) # capture spatial features with sliding window 
     x = layers.BatchNormalization()(x) # normalize feature maps to speed up training
     x = layers.Activation('relu')(x) # (Re)ctified (L)inear (U)nit: -ve values -> 0 (bend at x=0 induces non-linearity)
 
-    x = layers.Conv2D(filters, kernel_size, padding='same', activation=None)(x)
+    x = layers.Conv2D(filters, kernel_size, padding='same', kernel_regularizer=l2(1e-4), activation=None)(x)
     x = layers.BatchNormalization()(x)
 
     if shortcut.shape[-1] != filters: # ensure tensor dims (num channels) match before adding
@@ -136,12 +139,15 @@ def build_segmentation_model(input_shape: tuple[int, int, int]=(*IMG_SIZE, len(M
 
     # (3) Decoder: upsample resolution back by 2 and link skip connections to refine earlier features (high-level + low-level)
     u3 = layers.UpSampling2D(SCALE_FACTOR)(b) # (H, W) -> (H*2, W*2)
+    u3 = layers.Dropout(0.2)(u3)  
     c4 = residual_block(layers.Concatenate()([u3, c3]), FILTERS[2])
 
     u2 = layers.UpSampling2D(SCALE_FACTOR)(c4)
+    u2 = layers.Dropout(0.2)(u2)  
     c5 = residual_block(layers.Concatenate()([u2, c2]), FILTERS[1])
 
     u1 = layers.UpSampling2D(SCALE_FACTOR)(c5)
+    u1 = layers.Dropout(0.2)(u1)
     c6 = residual_block(layers.Concatenate()([u1, c1]), FILTERS[0])
 
     # Compute class probabilities for each pixel (e.g., [2.5, 0.3, 1.1, 3.2] -> [0.28, 0.03, 0.07, 0.62], i.e., 62% chance it's ET > 28% chance its bkgd > ...)
@@ -151,7 +157,7 @@ def build_segmentation_model(input_shape: tuple[int, int, int]=(*IMG_SIZE, len(M
     # Use gradients (of error func w.r.t. weights) from backpropogation to adjust each weight based on its contribution to prediction error
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE), # how to learn (adaptive learning rate + fast convergence (stable accuracy))
-        loss=lambda y_true, y_pred: dice_loss(y_true, y_pred) + tf.keras.losses.BinaryCrossentropy()(y_true, y_pred), # how to measure error (spatial overlap + class prob error)
+        loss=lambda y_true, y_pred: dice_loss(y_true, y_pred) + 0.5*tf.keras.losses.BinaryCrossentropy()(y_true, y_pred), # how to measure error (spatial overlap + class prob error)
         metrics=[DiceMetric()] # what to watch (segmentation performance)
     )
 
@@ -185,7 +191,7 @@ def data_generator(
             rotate=(AUG_CONFIG['rotate_range']), 
             shear=(AUG_CONFIG['shear_range']), 
             scale=(AUG_CONFIG['scale_range']), 
-            translate_percent={'x': (AUG_CONFIG['translate_range']), 'y': (AUG_CONFIG['translate_range'])} 
+            translate_percent={'x': (-0.1, 0.1), 'y': (-0.1, 0.1)}
         )),
         # Simulate deformations (↑ alpha ↑ distortion strength, ↑ sigma ↑ smoothness)
         iaa.ElasticTransformation(alpha=AUG_CONFIG['elastic_alpha'], sigma=AUG_CONFIG['elastic_sigma']) 
@@ -197,8 +203,8 @@ def data_generator(
             batch_masks = []
 
             for j in range(i, min(i + batch_size, num_samples)): # avoid going over end of dataset 
-                img = np.load(img_dir / img_files[j]).astype(np.float32) # uint8 [0, 255] -> float32 [0,1]
-                mask = np.load(mask_dir / mask_files[j]) # uint8 [0, 255]
+                img = np.load(img_dir / img_files[j]).astype(np.float32) / 255.0 # uint8 [0, 255] -> float32 [0,1]
+                mask = np.load(mask_dir / mask_files[j]).astype(np.float32) # uint8 [0, 255]
 
                 img = np.expand_dims(img, axis=-1)    # (H, W, 1)
                 mask = np.expand_dims(mask, axis=-1)  # (H, W, 1)
@@ -207,24 +213,147 @@ def data_generator(
                     uint8_img = (img * 255).astype(np.uint8) # float32 [0, 1] -> uint8 [0, 255] (for imgaug)
                     
                     # Convert mask to segmentation map to match augmentation with corresponding img
-                    segmap = SegmentationMapsOnImage(mask.squeeze(), shape=img.shape[:2]) # (H, W, 4) img -> (H, W) img ~ (H, W) mask
+                    mask_binary = (mask > 0.5).astype(np.uint8)
+
+                    segmap = SegmentationMapsOnImage(mask_binary.squeeze(), shape=img.shape[:2]) # (H, W, 4) img -> (H, W) img ~ (H, W) mask
 
                     # Apply augmentation pipeline to both image and mask
                     aug_img, aug_segmap = seq(image=uint8_img, segmentation_maps=segmap)
-                    img = aug_img.astype(np.float32) # uint8 [0, 255] -> float32 [0,1] (convert back for model)
+                    img = aug_img.astype(np.float32) / 255.0 # uint8 [0, 255] -> float32 [0,1] (convert back for model)
                     
                     mask = np.expand_dims(aug_segmap.get_arr(), axis=-1).astype(np.float32) 
-                    # print("mask unique values:", np.unique(mask))
-
+                    mask = (mask > 0.5).astype(np.float32)
                     
                     # mask_to_encode = aug_segmap.get_arr() # SegmentationMapsOnImage obj -> arr
                     # mask_to_encode = np.clip(mask_to_encode, 0, num_classes=-1)
                 
+                
                 batch_imgs.append(img)
+                # print("mask unique values:", np.unique(mask))
+                
                 batch_masks.append(mask)
                 
 
             yield np.array(batch_imgs), np.array(batch_masks)
+
+
+# def data_generator(
+#     img_dir: Path, 
+#     mask_dir: Path, 
+#     augment: bool = False, 
+#     batch_size: int = BATCH_SIZE
+# ) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:
+    
+#     img_files = sorted(list(img_dir.iterdir()))
+#     mask_files = sorted(list(mask_dir.iterdir()))
+#     num_samples = len(img_files)
+    
+#     while True:
+#         indices = np.arange(num_samples)
+#         if augment:
+#             np.random.shuffle(indices)
+        
+#         for i in range(0, num_samples, batch_size):
+#             batch_imgs = []
+#             batch_masks = []
+            
+#             batch_indices = indices[i:min(i + batch_size, num_samples)]
+            
+#             for idx in batch_indices:
+#                 img = np.load(img_files[idx]).astype(np.float32)
+#                 mask = np.load(mask_files[idx]).astype(np.float32)
+                
+#                 if augment:
+#                     import cv2
+                    
+#                     # Random horizontal flip
+#                     if np.random.rand() > 0.5:
+#                         img = np.fliplr(img)
+#                         mask = np.fliplr(mask)
+                    
+#                     # Random vertical flip
+#                     if np.random.rand() > 0.5:
+#                         img = np.flipud(img)
+#                         mask = np.flipud(mask)
+                    
+#                     # Random rotation
+#                     if np.random.rand() > 0.5:
+#                         angle = np.random.uniform(-10, 10)
+#                         h, w = img.shape[:2]
+#                         M = cv2.getRotationMatrix2D((w/2, h/2), angle, 1.0)
+#                         img = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=0)
+#                         mask = cv2.warpAffine(mask, M, (w, h), flags=cv2.INTER_NEAREST, borderValue=0)
+#                         mask = (mask > 0.5).astype(np.float32)
+                
+#                 # CRITICAL: Add channel dimension AFTER augmentation
+#                 img = np.expand_dims(img, axis=-1)
+#                 mask = np.expand_dims(mask, axis=-1)
+                
+#                 batch_imgs.append(img)
+#                 batch_masks.append(mask)
+            
+#             yield np.array(batch_imgs), np.array(batch_masks)
+
+# def data_generator(
+#     img_dir: Path, 
+#     mask_dir: Path, 
+#     augment: bool = False, 
+#     batch_size: int = BATCH_SIZE
+# ) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:
+    
+#     img_files = sorted(list(img_dir.iterdir()))
+#     mask_files = sorted(list(mask_dir.iterdir()))
+#     num_samples = len(img_files)
+    
+#     while True:
+#         indices = np.arange(num_samples)
+#         if augment:
+#             np.random.shuffle(indices)
+        
+#         for i in range(0, num_samples, batch_size):
+#             batch_imgs = []
+#             batch_masks = []
+            
+#             batch_indices = indices[i:min(i + batch_size, num_samples)]
+            
+#             for idx in batch_indices:
+#                 # Load data
+#                 img = np.load(img_files[idx])  # uint8 [0, 255]
+#                 mask = np.load(mask_files[idx])  # uint8 [0, 1]
+                
+#                 if augment:
+#                     import cv2
+                    
+#                     # Random horizontal flip
+#                     if np.random.rand() > 0.5:
+#                         img = np.fliplr(img)
+#                         mask = np.fliplr(mask)
+                    
+#                     # Random vertical flip
+#                     if np.random.rand() > 0.5:
+#                         img = np.flipud(img)
+#                         mask = np.flipud(mask)
+                    
+#                     # Random rotation (-10 to +10 degrees)
+#                     if np.random.rand() > 0.5:
+#                         angle = np.random.uniform(-10, 10)
+#                         h, w = img.shape[:2]
+#                         M = cv2.getRotationMatrix2D((w/2, h/2), angle, 1.0)
+#                         img = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=0)
+#                         mask = cv2.warpAffine(mask, M, (w, h), flags=cv2.INTER_NEAREST, borderValue=0)
+                
+#                 # Normalize AFTER augmentation
+#                 img = img.astype(np.float32) / 255.0  # [0, 255] → [0, 1]
+#                 mask = mask.astype(np.float32)  # [0, 1] → [0.0, 1.0]
+                
+#                 # Add channel dimension
+#                 img = np.expand_dims(img, axis=-1)
+#                 mask = np.expand_dims(mask, axis=-1)
+                
+#                 batch_imgs.append(img)
+#                 batch_masks.append(mask)
+            
+#             yield np.array(batch_imgs), np.array(batch_masks)
 
 
 def train_model() -> None:
@@ -242,7 +371,7 @@ def train_model() -> None:
     MASK_VALID_DIR = OUTPUT_DIR / 'masks' / 'valid'
 
     # Initialize data generators for one-hot encoding and augmentation during model.fit()
-    train_gen = data_generator(IMG_TRAIN_DIR, MASK_TRAIN_DIR, augment=True)
+    train_gen = data_generator(IMG_TRAIN_DIR, MASK_TRAIN_DIR, augment=False)
     valid_gen = data_generator(IMG_VALID_DIR, MASK_VALID_DIR, augment=False)
 
     # Set num batches to process per epoch
@@ -268,6 +397,88 @@ def train_model() -> None:
 
     model.save(Path(MODELS_DIR / 'octa_model.keras'))
     print(f"*COMPLETE: model has been trained and saved to 'models' folder")
+
+# def load_all_data():
+#     """Load entire dataset into memory (only 300 images, totally fine)"""
+    
+#     IMG_TRAIN_DIR = OUTPUT_DIR / 'images' / 'train'
+#     IMG_VALID_DIR = OUTPUT_DIR / 'images' / 'valid'
+#     MASK_TRAIN_DIR = OUTPUT_DIR / 'masks' / 'train'
+#     MASK_VALID_DIR = OUTPUT_DIR / 'masks' / 'valid'
+    
+#     # Load training data
+#     train_imgs = []
+#     train_masks = []
+#     for img_file, mask_file in zip(sorted(IMG_TRAIN_DIR.iterdir()), 
+#                                      sorted(MASK_TRAIN_DIR.iterdir())):
+#         img = np.load(img_file).astype(np.float32) / 255.0  # [0,255] -> [0,1]
+#         mask = np.load(mask_file).astype(np.float32)  # [0,1] -> [0.0,1.0]
+        
+#         train_imgs.append(np.expand_dims(img, axis=-1))
+#         train_masks.append(np.expand_dims(mask, axis=-1))
+    
+#     # Load validation data
+#     valid_imgs = []
+#     valid_masks = []
+#     for img_file, mask_file in zip(sorted(IMG_VALID_DIR.iterdir()), 
+#                                      sorted(MASK_VALID_DIR.iterdir())):
+#         img = np.load(img_file).astype(np.float32) / 255.0
+#         mask = np.load(mask_file).astype(np.float32)
+        
+#         valid_imgs.append(np.expand_dims(img, axis=-1))
+#         valid_masks.append(np.expand_dims(mask, axis=-1))
+    
+#     X_train = np.array(train_imgs)
+#     y_train = np.array(train_masks)
+#     X_valid = np.array(valid_imgs)
+#     y_valid = np.array(valid_masks)
+    
+#     print(f"Loaded data:")
+#     print(f"  X_train: {X_train.shape}, range [{X_train.min():.3f}, {X_train.max():.3f}]")
+#     print(f"  y_train: {y_train.shape}, range [{y_train.min():.3f}, {y_train.max():.3f}]")
+#     print(f"  X_valid: {X_valid.shape}, range [{X_valid.min():.3f}, {X_valid.max():.3f}]")
+#     print(f"  y_valid: {y_valid.shape}, range [{y_valid.min():.3f}, {y_valid.max():.3f}]")
+    
+#     return X_train, y_train, X_valid, y_valid
+
+
+# def train_model() -> None:
+#     """Train without generators - just use numpy arrays"""
+    
+#     # Load all data
+#     X_train, y_train, X_valid, y_valid = load_all_data()
+    
+#     # Build model
+#     model = build_segmentation_model()
+    
+#     MODELS_DIR = Path(__file__).resolve().parent / 'models' 
+#     MODELS_DIR.mkdir(exist_ok=True)
+    
+#     callbacks = [
+#         EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1),
+#         ModelCheckpoint(
+#             Path(MODELS_DIR / 'octa_model_checkpoint.keras'), 
+#             monitor='val_loss', 
+#             save_best_only=True, 
+#             verbose=1
+#         ),
+#         TensorBoard(log_dir=Path(MODELS_DIR / 'logs'))
+#     ]
+    
+#     # Train directly on numpy arrays - no generators!
+#     history = model.fit(
+#         X_train, y_train,
+#         validation_data=(X_valid, y_valid),
+#         batch_size=BATCH_SIZE,
+#         epochs=EPOCHS,
+#         callbacks=callbacks,
+#         verbose=1
+#     )
+    
+#     model.save(Path(MODELS_DIR / 'octa_model.keras'))
+#     print(f"*COMPLETE: model trained and saved")
+    
+#     return history
 
 
 if __name__ == '__main__':

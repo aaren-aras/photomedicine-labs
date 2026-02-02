@@ -38,7 +38,7 @@ def save_sample(img: np.ndarray, mask: np.ndarray, id: str, split: str) -> None:
     img_path = OUTPUT_DIR / 'images' / split / f'{id}.npy' 
     np.save(img_path, img) # float32
 
-    mask_path = OUTPUT_DIR / 'masks' / split / f'{id}_mask.npy'
+    mask_path = OUTPUT_DIR / 'masks' / split / f'{id}.npy'
     np.save(mask_path, mask) # uint8 
     
     metadata_path = OUTPUT_DIR / 'metadata' / split / f'{id}.json'
@@ -63,8 +63,8 @@ def prepare_data() -> None:
         sample = process_sample(id, label=LABEL, binarize_mask=BINARIZE_MASK)
         all_samples.append(sample)
     
-    # 70% train, 15% valid, 15% test
-    train, temp = train_test_split(all_samples, test_size=0.3, random_state=RANDOM_STATE) 
+    # 80% train, 10% valid, 10% test
+    train, temp = train_test_split(all_samples, test_size=0.2, random_state=RANDOM_STATE) 
     valid, test = train_test_split(temp, test_size=0.5, random_state=RANDOM_STATE) 
 
     splits = { 'train': train, 'valid': valid, 'test': test }
