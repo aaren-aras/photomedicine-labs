@@ -156,60 +156,69 @@ def load_octa500() -> list[tuple]:
 
 def load_rose() -> list[tuple]:
     """
-    Load ROSE-1 dataset images + vessel masks.
+    Load ROSE-1 (SVC_DVC) + ROSE-2 datasets.
 
-    ROSE directory structure varies by download source — we try multiple
-    common layouts and report what we find.
+    ROSE-1: 304×304, Optovue SD-OCT, pixel-level gt masks
+        - Use SVC_DVC slab only (matches OCTA-500 ILM_OPL — full retinal plexus)
+        - Use both train/ and test/ splits for training our model
+          (ROSE's test split is for their own benchmark, not ours)
+        - Our held-out test set is OCTA-500 only
 
-    Returns list of (img, mask, sample_id) tuples.
-    Note: ROSE masks are already binary {0,255} — binarized to {0,1}.
+    ROSE-2: 840×840, Heidelberg SD-OCT, pixel-level gt masks
+        - Different scanner = different noise profile = better generalisation
+        - Downsampled to 400×400 (same as OCTA-500 target size)
+        - Use both train/ and test/ splits for same reason as ROSE-1
+
+    Total ROSE contribution: ~151 images across 2 scanners
     """
-    # Try common ROSE directory layouts
-    possible_layouts = [
-        (ROSE_DIR / 'ROSE-1' / 'train' / 'original',
-         ROSE_DIR / 'ROSE-1' / 'train' / 'gt'),
-        (ROSE_DIR / 'ROSE1'  / 'train' / 'img',
-         ROSE_DIR / 'ROSE1'  / 'train' / 'gt'),
-        (ROSE_DIR / 'train'  / 'original',
-         ROSE_DIR / 'train'  / 'gt'),
-        (ROSE_DIR / 'images', ROSE_DIR / 'masks'),
+    sources = [
+        # (img_dir, mask_dir, label)
+        (ROSE_DIR / 'ROSE-1' / 'SVC_DVC' / 'train' / 'img',
+         ROSE_DIR / 'ROSE-1' / 'SVC_DVC' / 'train' / 'gt',
+         'rose1_train'),
+        (ROSE_DIR / 'ROSE-1' / 'SVC_DVC' / 'test'  / 'img',
+         ROSE_DIR / 'ROSE-1' / 'SVC_DVC' / 'test'  / 'gt',
+         'rose1_test'),
+        (ROSE_DIR / 'ROSE-2' / 'train' / 'original',
+         ROSE_DIR / 'ROSE-2' / 'train' / 'gt',
+         'rose2_train'),
+        (ROSE_DIR / 'ROSE-2' / 'test'  / 'original',
+         ROSE_DIR / 'ROSE-2' / 'test'  / 'gt',
+         'rose2_test'),
     ]
 
-    img_dir = mask_dir = None
-    for candidate_img, candidate_mask in possible_layouts:
-        if candidate_img.exists():
-            img_dir  = candidate_img
-            mask_dir = candidate_mask
-            print(f'ROSE found at: {img_dir}')
-            break
-
-    if img_dir is None:
-        print(f'WARNING: ROSE not found. Tried layouts:')
-        for layout in possible_layouts:
-            print(f'  {layout[0]}')
-        print('Check your ROSE directory structure and update paths above.')
-        return []
-
-    samples = []
+    samples  = []
     extensions = {'.png', '.tif', '.tiff', '.bmp', '.jpg'}
 
-    for img_path in tqdm(sorted(img_dir.iterdir()), desc='Loading ROSE'):
-        if img_path.suffix.lower() not in extensions:
+    for img_dir, mask_dir, label in sources:
+        if not img_dir.exists():
+            print(f'WARNING: {label} not found at {img_dir}')
             continue
 
-        # ROSE mask filenames sometimes differ — try exact match then stem match
-        mask_path = mask_dir / img_path.name
-        if not mask_path.exists():
+        count = 0
+        for img_path in sorted(img_dir.iterdir()):
+            if img_path.suffix.lower() not in extensions:
+                continue
+
+            # Match mask by stem — handles extension mismatches
+            mask_path = None
             for ext in extensions:
                 candidate = mask_dir / (img_path.stem + ext)
                 if candidate.exists():
                     mask_path = candidate
                     break
 
-        img, mask = load_and_preprocess(img_path, mask_path)
-        samples.append((img, mask, f'rose_{img_path.stem}'))
+            if mask_path is None:
+                print(f'WARNING: no mask found for {img_path.name}, skipping')
+                continue
 
-    print(f'ROSE: {len(samples)} samples loaded')
+            img, mask = load_and_preprocess(img_path, mask_path)
+            samples.append((img, mask, f'{label}_{img_path.stem}'))
+            count += 1
+
+        print(f'  {label}: {count} samples loaded')
+
+    print(f'ROSE total: {len(samples)} samples')
     return samples
 
 

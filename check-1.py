@@ -112,7 +112,7 @@ def visualize_motion_artifacts(n: int = 3):
     looks realistic before training the restoration model.
     """
     # Import here to keep check.py runnable without full model.py
-    from model import simulate_motion_artifacts
+    from model_1 import simulate_motion_artifacts
 
     img_files = sorted(IMG_TRAIN_DIR.iterdir())
     severities = [0.15, 0.30, 0.40]  # mild / medium / severe

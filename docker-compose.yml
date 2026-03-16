@@ -1,0 +1,25 @@
+services:
+  photomedicine_labs:
+    build: .
+    volumes:
+      # Mount entire project root into container
+      # Changes to .py files reflect immediately without rebuild
+      - .:/workspace/photomedicine_labs
+    
+    ipc: host
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack:
+        soft: 67108864
+        hard: 67108864
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
