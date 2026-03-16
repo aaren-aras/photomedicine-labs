@@ -26,6 +26,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = (SCRIPT_DIR / 'data/OCTA-500_processed').resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+MODELS_DIR = SCRIPT_DIR / 'models'
+MODELS_DIR.mkdir(exist_ok=True)
+
 # Use GPU for faster training (if available)
 physical_devices = tf.config.list_physical_devices('GPU')
 print('*AVAILABLE GPUs:', physical_devices)

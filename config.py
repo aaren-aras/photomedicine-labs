@@ -1,25 +1,44 @@
-
-
+''' D A T A S E T '''
+# Choose OCTA-500 (G)round (T)ruth label
 LABEL = 'GT_LargeVessel'
-BINARIZE_MASK = True
-RANDOM_STATE = 28
-
-
-
-LABEL_MAP = { 0: 'background', 1: 'NCR', 2: 'ED', 3: 'ET' } # 4 -> 3
-EPSILON = 1e-8 # avoid dividing by 0
-
-
-IMG_SIZE = (400, 400)
+# Do [0, 255] -> [0, 1] 
+BINARIZE_MASK = True 
+# Hold seed for data split
+RANDOM_STATE = 28 
+# Fix OCTA-500 400x400 and upscale ROSE 304x304->400x400
+IMG_SIZE = (400, 400) 
+# Keep 1-channel greyscale OCTA projections (*TO DO: modality per OCTA slab? ILM_OPL vs. OPL_BM)
 MODALITIES = ('OCTA',) 
-NUM_CLASSES = 1 # bkgd vs. vessel
+# Do binary segmentation for BinaryCrossentropy() and dice_loss(): vessel (1) vs. bkgd (0)
+NUM_CLASSES = 1 
+
+''' M O D E L '''
+# Progress U-net encoders
+FILTERS = (16, 32, 64, 128) 
+# Select conv. filter matrix size
+KERNEL_SIZE = 3 
+# Pool/Upsample per stage
+SCALE_FACTOR = 2 
+# Deactivate some neurons @ bottleneck: prevent overfitting or underfitting
+DROPOUT_RATE = 0.3 
+
+''' O P T I M I Z E R '''
+# Use small gradient steps for sparser vessel structures (Liao et al. Section 4.1)
+LEARNING_RATE = 1e-4
+# Avoid dividing by 0 
+EPSILON = 1e-8 
+# Forget gradient history faster (Liao et al. Section 4.1)
+ADAM_BETA1 = 0.8 
+# Go slower on bigger gradients (Liao et al. Section 4.1)
+ADAM_BETA2 = 0.999 
+# Prevent oscillation in late training for near-min loss
+LR_DECAY_FACTOR = 0.95 
+#
+LR_DECAY_STEPS  = 10_000
 
 
-FILTERS = (16, 32, 64, 128)
-KERNEL_SIZE = 3
-SCALE_FACTOR = 2
-DROPOUT_RATE = 0.3
-LEARNING_RATE = 5e-4
+''' T R A I N I N G '''
+
 BATCH_SIZE = 16 # num samples (image + mask) per training step (before updating weights)
 EPOCHS = 50 # full passes through entire dataset
 AUG_CONFIG = {
