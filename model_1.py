@@ -606,6 +606,6 @@ def train_segmentation():
 
 
 if __name__ == '__main__':
-    # train_restoration()
-    # train_segmentation()
+    train_restoration()
+    train_segmentation()
     pass
