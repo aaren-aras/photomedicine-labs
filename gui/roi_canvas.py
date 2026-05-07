@@ -181,7 +181,7 @@ class ROICanvas(QLabel):
         p.setPen(QPen(QColor(TEXT_DIM)))
         p.setFont(QFont("Courier New", 12))
         p.drawText(pm.rect(), Qt.AlignCenter,
-                   "Load an OCT image\nor click 'Open Image'")
+                   "Load an OCTA image\nor click 'Open Image'")
         p.end()
         self.setPixmap(pm)
 

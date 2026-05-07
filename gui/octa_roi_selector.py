@@ -15,12 +15,12 @@ def main():
     Entrypoint for the OCTA ROI GUI, standalone executable (#!/usr/bin/env python3).
 
     Usage:
-        python oct_roi_selector.py
-        python oct_roi_selector.py --image path/to/image.png
+        python octa_roi_selector.py
+        python octa_roi_selector.py --image path/to/image.png
 
     """
     parser = argparse.ArgumentParser(
-        description="OCT ROI Selector — Galvo Waveform Generator"
+        description="OCTA ROI Selector->Galvo Waveform Generator"
     )
     parser.add_argument(
         "--image", type=str, default=None,
@@ -32,7 +32,7 @@ def main():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps,    True)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("OCT ROI Selector")
+    app.setApplicationName("OCTA ROI Selector")
 
     window = OCTROISelector()
     window.show()

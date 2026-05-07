@@ -54,7 +54,7 @@ class OCTROISelector(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("OCT ROI Selector  —  Galvo Waveform Generator")
+        self.setWindowTitle("OCTA ROI Selector->Galvo Waveform Generator")
         self.setMinimumSize(1200, 760)
         self.setStyleSheet(STYLESHEET)
 
@@ -94,12 +94,12 @@ class OCTROISelector(QMainWindow):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(10)
 
-        hdr = QLabel("OCT ROI\nSELECTOR")
+        hdr = QLabel("OCTA ROI\nSELECTOR")
         hdr.setObjectName("header")
         hdr.setAlignment(Qt.AlignCenter)
         lay.addWidget(hdr)
 
-        sub = QLabel("Galvo Waveform Generator\nOCTA-500  ·  0–2 V range")
+        sub = QLabel("Galvo Waveform Generator\nOCTA-500  · assume 0–2 V range")
         sub.setObjectName("dim")
         sub.setAlignment(Qt.AlignCenter)
         lay.addWidget(sub)
@@ -295,7 +295,7 @@ class OCTROISelector(QMainWindow):
         hl = QVBoxLayout(ht)
         help_lbl = QLabel(
             "<b>How to use:</b><br><br>"
-            "1. Load an OCT image (PNG/BMP/TIFF) or use Demo<br>"
+            "1. Load an OCTA image (PNG/BMP/TIFF) or use Demo<br>"
             "2. Click + drag to draw an ROI rectangle<br>"
             "3. Read off X/Y galvo voltages in the readout bar<br>"
             "4. Click 'Preview Waveforms' to see sawtooth + stair-step<br>"
