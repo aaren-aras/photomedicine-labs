@@ -1,5 +1,0 @@
-imgaug
-scikit-learn
-tqdm
-Pillow
-numpy
