@@ -137,7 +137,7 @@ def simulate_motion_artifacts(clean: np.ndarray, severity: float) -> np.ndarray:
 
 def restoration_generator(
     img_dir: Path, 
-    augment: bool,
+    augment: bool
 ) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:
     """
     Yields degraded-clean image pairs for model training. Degradation is re-sampled
