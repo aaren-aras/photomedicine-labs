@@ -86,7 +86,7 @@ def residual_block(
     )(x)
     if use_batchnorm:
         x = layers.BatchNormalization()(x)
-    # Keeps layers from collapsing into 1 (*TO DO: use layers.LeakyReLU instead?)
+    # Keeps layers from collapsing into 1 (*TO DO: use layers.LeakyReLU(alpha=0.1) instead?)
     x = layers.Activation('relu')(x) 
 
     x = layers.Conv2D(
