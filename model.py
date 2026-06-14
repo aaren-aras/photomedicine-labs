@@ -537,7 +537,6 @@ def segmentation_generator(
         iaa.Sometimes(0.5, iaa.Affine(
             rotate=GEO_AUG['rotate_range'],
             scale=GEO_AUG['scale_range'],
-            translate_percent=GEO_AUG['translate_range'],
             translate_percent={
                 'x': GEO_AUG['translate_range'],
                 'y': GEO_AUG['translate_range']
@@ -614,8 +613,8 @@ def train_segmentation_model() -> None:
         rest_model.trainable = False  # frozen: inference only
         print('*PIPELINE CONNECTED: training segmentation on restored images.')
     else:
-        print('*WARNING: \'restoration_best.keras\' not found...'
-            'Training segmentation on clean images directly.')
+        print("*WARNING: 'restoration_best.keras' not found..."
+            "Training segmentation on clean images directly.")
 
     model = build_segmentation_model()
     model.summary()
