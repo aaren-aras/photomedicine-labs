@@ -1,7 +1,6 @@
 """
-evaluate.py
-===========
-Full evaluation pipeline for both stages.
+Benchmarks trained pipeline using the 'test' split and makes 
+metric tables, distribution plots, and visual comparisons.
 
 Stage 1 — Restoration:
     - Takes clean test images, simulates degradation, runs through restoration model
@@ -19,148 +18,48 @@ Usage:
     python evaluate.py --stage 2          # segmentation only
     python evaluate.py --single <path>    # single image inference
 """
-
-"""
-evaluate.py
-===========
-Full evaluation pipeline — runs AFTER training.
-
-Produces:
-    1. Quantitative metrics table (Dice, IoU, clDice, PSNR, SSIM) on test set
-    2. Visual comparison: Input | Restored | Ground Truth | Prediction | Overlay
-    3. Per-sample metric distribution plots
-    4. Single-image inference demo
-
-Usage:
-    python evaluate.py                    # full test set evaluation
-    python evaluate.py --single <path>    # inference on one image
-"""
-
+import importlib
+import sys
 from pathlib import Path
-
 import argparse
+
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # non-interactive backend for container/headless environments
+matplotlib.use('Agg') # don't let Matplotlib open windows inside Docker 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import tensorflow as tf
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-OUTPUT_DIR  = Path('data') / 'processed'
-IMG_TEST    = OUTPUT_DIR / 'images' / 'test'
-MASK_TEST   = OUTPUT_DIR / 'masks'  / 'test'
-MODELS_DIR  = Path('benchmark')
-RESULTS_DIR = Path('images')
+from config import EPSILON, THRESHOLD
+
+ROOT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = ROOT_DIR / 'data' / 'processed'
+MODELS_DIR = ROOT_DIR / 'benchmark'
+RESULTS_DIR = ROOT_DIR / 'images'
 RESULTS_DIR.mkdir(exist_ok=True)
 
-# ── Import custom objects from model ──────────────────────────────────────────
-# Import from whichever model file exists
-import importlib, sys
-for mod_name in ['model_1', 'model']:
-    if Path(f'{mod_name}.py').exists():
-        mod = importlib.import_module(mod_name)
-        dice_coefficient     = mod.dice_coefficient
-        DiceMetric           = mod.DiceMetric
-        IoUMetric            = mod.IoUMetric
-        cl_dice_loss         = mod.cl_dice_loss
-        simulate_motion_artifacts = mod.simulate_motion_artifacts
-        break
-
+# Imports stuff from 'model.py'
+mod = importlib.import_module('model')
+dice_coefficient = mod.dice_coefficient
+DiceMetric = mod.DiceMetric
+IoUMetric = mod.IoUMetric
+cl_dice_loss = mod.cl_dice_loss
+simulate_motion_artifacts = mod.simulate_motion_artifacts
 gpus = tf.config.list_physical_devices('GPU')
+
 if gpus:
+    # Allocate memory incrementally instead of all at once
     tf.config.experimental.set_memory_growth(gpus[0], True)
-    print(f'GPU: {gpus[0].name}')
+    print(f'*GPUs FOUND: {gpus[0].name}')
 else:
-    print('WARNING: No GPU found — running on CPU')
+    print('*WARNING: No GPU found. Testing will begin on CPU...')
 
+# ── Stage 1: Restoration ──
 
-def compute_segmentation_metrics(y_true: np.ndarray, y_pred_prob: np.ndarray,
-                                  threshold: float = 0.5) -> dict:
-    """
-    Compute full segmentation metric suite for one image.
-    Dice, IoU, Precision, Recall, Specificity, clDice.
-    """
+def compute_restoration_metrics(clean: np.ndarray, restored: np.ndarray) -> dict[str, float]:
+    """Calculates PSNR and SSIM (Liao et al. targets: PSNR > 23 dB, SSIM > 0.55)."""
 
     """
-    Compute the full set of segmentation metrics for one image.
-
-    Metrics explained:
-        Dice (F1):    2×TP / (2×TP + FP + FN)
-                      Harmonic mean of precision and recall. The primary metric
-                      for medical image segmentation. Range [0,1], higher=better.
-
-        IoU (Jaccard): TP / (TP + FP + FN)
-                      Stricter than Dice (denominator is larger).
-                      Same ordering as Dice but lower absolute values.
-                      Range [0,1], higher=better.
-
-        Precision:    TP / (TP + FP)
-                      Of all predicted vessel pixels, how many are actually vessels?
-                      Low precision = over-segmentation (predicting too much).
-
-        Recall:       TP / (TP + FN)
-                      Of all true vessel pixels, how many did we find?
-                      Low recall = under-segmentation (missing vessels).
-
-        clDice:       Centerline Dice — topology-preserving metric.
-                      Penalises broken vessel centerlines more than pixel errors.
-                      Critical for OCTA: a disconnected vessel map is clinically
-                      misleading even if Dice looks reasonable.
-
-        Specificity:  TN / (TN + FP)
-                      Of all background pixels, how many did we correctly reject?
-                      Usually very high in vessel segmentation (>0.95) because
-                      background dominates and is easy to classify.
-
-    Args:
-        y_true:      binary mask {0,1}, shape (H,W) or (H,W,1)
-        y_pred_prob: probability map [0,1], same shape
-        threshold:   classification threshold (0.5 is standard)
-
-    Returns:
-        dict of metric name → float value
-    """
-    y_true = y_true.squeeze().astype(np.float32)
-    y_pred = y_pred_prob.squeeze()
-    y_bin  = (y_pred > threshold).astype(np.float32)
-
-    eps = 1e-8
-    TP  = np.sum(y_true * y_bin)
-    FP  = np.sum((1 - y_true) * y_bin)
-    FN  = np.sum(y_true * (1 - y_bin))
-    TN  = np.sum((1 - y_true) * (1 - y_bin))
-
-    dice        = (2 * TP + eps) / (2 * TP + FP + FN + eps)
-    iou         = (TP + eps)     / (TP + FP + FN + eps)
-    precision   = (TP + eps)     / (TP + FP + eps)
-    recall      = (TP + eps)     / (TP + FN + eps)
-    specificity = (TN + eps)     / (TN + FP + eps)
-
-    # clDice via TF (uses soft skeleton approximation)
-    yt_tf = tf.constant(y_true[np.newaxis, :, :, np.newaxis])
-    yp_tf = tf.constant(y_bin[np.newaxis,  :, :, np.newaxis])
-    cldice = float(1.0 - cl_dice_loss(yt_tf, yp_tf).numpy())
-
-    return {
-        'dice':        float(dice),
-        'iou':         float(iou),
-        'precision':   float(precision),
-        'recall':      float(recall),
-        'specificity': float(specificity),
-        'cldice':      cldice,
-    }
-
-
-def compute_restoration_metrics(clean: np.ndarray, restored: np.ndarray) -> dict:
-    """
-    PSNR and SSIM for restoration quality.
-    Targets per Liao et al.: PSNR > 23 dB, SSIM > 0.55
-    """
-
-    """
-    Compute image quality metrics for restoration model evaluation.
-
     PSNR (Peak Signal-to-Noise Ratio, dB):
         10 × log₁₀(MAX² / MSE)
         Measures pixel-level fidelity. Higher=better.
@@ -175,7 +74,11 @@ def compute_restoration_metrics(clean: np.ndarray, restored: np.ndarray) -> dict
     """
     c = tf.constant(clean[np.newaxis].astype(np.float32))
     r = tf.constant(restored[np.newaxis].astype(np.float32))
+
+    # Peak signal-to-noise ratio:
     psnr = float(tf.image.psnr(c, r, max_val=1.0).numpy()[0])
+    
+    # Structural similarity index:  
     ssim = float(tf.image.ssim(c, r, max_val=1.0).numpy()[0])
     return {'psnr': psnr, 'ssim': ssim}
 
@@ -362,9 +265,47 @@ def _save_restoration_metrics(all_metrics):
     print(f'Saved {out}')
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# STAGE 2: SEGMENTATION EVALUATION
-# ═══════════════════════════════════════════════════════════════════════════════
+# ── Stage 2: Segmentation ──
+def compute_segmentation_metrics(y_true: np.ndarray, y_pred_prob: np.ndarray) -> dict[str, float]:
+    """Calculates Dice, IoU, Precision, Recall, Specificity, clDice."""
+    y_true = y_true.squeeze().astype(np.float32) # ground truth (binary mask)
+    y_pred = y_pred_prob.squeeze() # model's predictions (probability map)
+    y_bin = (y_pred > THRESHOLD).astype(np.float32) # prob map -> binary choice
+
+    tp = np.sum(y_true * y_bin)
+    fp = np.sum((1 - y_true) * y_bin)
+    fn = np.sum(y_true * (1 - y_bin))
+    tn = np.sum((1 - y_true) * (1 - y_bin))
+
+    # How well do predicted and ground truth vessels overlap?
+    dice = (2 * tp + EPSILON) / (2 * tp + fp + fn + EPSILON)
+    
+    # How strictly do predicted and ground truth vessel boundaries intersect?
+    iou = (tp + EPSILON) / (tp + fp + fn + EPSILON)
+    
+    # How many predicted vessels were true?
+    precision = (tp + EPSILON) / (tp + fp + EPSILON)
+    
+    # How many true vessels were found?
+    recall = (tp + EPSILON) / (tp + fn + EPSILON)
+    
+    # How many bkgd pixels were rejected?
+    specificity = (tn + EPSILON) / (tn + fp + EPSILON)
+
+    # How well do predicted vessels preserve structural connectivity?
+    yt_tf = tf.constant(y_true[np.newaxis, :, :, np.newaxis]) # (H, W) -> (1, H, W)
+    yp_tf = tf.constant(y_bin[np.newaxis,  :, :, np.newaxis]) # (1, H, W) -> (1, H, W, 1)
+    cldice = float(1.0 - cl_dice_loss(yt_tf, yp_tf).numpy())
+
+    return {
+        'dice': float(dice),
+        'iou': float(iou),
+        'precision': float(precision),
+        'recall': float(recall),
+        'specificity': float(specificity),
+        'cldice': cldice,
+    }
+
 
 def evaluate_segmentation(n_visual: int = 6):
     """
@@ -480,11 +421,11 @@ def _save_segmentation_metrics(all_metrics, keys):
     for ax, k in zip(axes, keys):
         vals = [m[k] for _, _, _, m in all_metrics]
         ax.boxplot(vals, patch_artist=True,
-                   boxprops=dict(facecolor='steelblue', alpha=0.7))
+            boxprops=dict(facecolor='steelblue', alpha=0.7))
         ax.set_title(k)
         ax.set_ylim(0, 1)
         ax.axhline(np.mean(vals), color='red', linestyle='--',
-                   label=f'mean={np.mean(vals):.3f}')
+            label=f'mean={np.mean(vals):.3f}')
         ax.legend(fontsize=8)
 
     plt.tight_layout()
@@ -541,10 +482,10 @@ def run_full_pipeline(img_path: str):
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
     fig.suptitle(f'Full Pipeline: {path.name}', fontsize=12)
 
-    axes[0].imshow(img.squeeze(),       cmap='gray'); axes[0].set_title('Input (Degraded)')
-    axes[1].imshow(restored.squeeze(),  cmap='gray'); axes[1].set_title('Restored')
-    axes[2].imshow(pred,                cmap='hot');  axes[2].set_title('Vessel Probability')
-    axes[3].imshow(pred_bin,            cmap='gray'); axes[3].set_title('Vessel Mask (0.5 threshold)')
+    axes[0].imshow(img.squeeze(), cmap='gray'); axes[0].set_title('Input (Degraded)')
+    axes[1].imshow(restored.squeeze(), cmap='gray'); axes[1].set_title('Restored')
+    axes[2].imshow(pred, cmap='hot'); axes[2].set_title('Vessel Probability')
+    axes[3].imshow(pred_bin, cmap='gray'); axes[3].set_title('Vessel Mask (0.5 threshold)')
 
     for ax in axes:
         ax.axis('off')
@@ -555,10 +496,6 @@ def run_full_pipeline(img_path: str):
     plt.close()
     print(f'Saved {out}')
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
