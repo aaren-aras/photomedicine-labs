@@ -435,7 +435,7 @@ def _save_segmentation_metrics(all_metrics, keys):
     print(f'*SAVED: {out}')
 
 
-def run_full_pipeline(img_path: str):
+def run_pipeline(img_path: str):
     """
     Run the complete two-stage pipeline on a single image.
     Useful for running on real degraded OCTA data.
@@ -456,9 +456,9 @@ def run_full_pipeline(img_path: str):
         img = np.expand_dims(img, axis=-1)
 
     # Stage 1: restore
-    rest_path = MODELS_DIR / 'restoration_best.keras'
-    if rest_path.exists():
-        rest_model = tf.keras.models.load_model(str(rest_path), compile=False)
+    rest_model_path = MODELS_DIR / 'restoration_best.keras'
+    if rest_model_path.exists():
+        rest_model = tf.keras.models.load_model(str(rest_model_path), compile=False)
         restored = rest_model.predict(img[np.newaxis], verbose=0)[0]
         rest_metrics = compute_restoration_metrics(img, restored)
         print(f'Stage 1 done — PSNR={rest_metrics["psnr"]:.1f}dB, '
@@ -506,7 +506,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.single:
-        run_full_pipeline(args.single)
+        run_pipeline(args.single)
     elif args.stage == 1:
         evaluate_restoration()
     elif args.stage == 2:
