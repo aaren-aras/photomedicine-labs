@@ -7,7 +7,7 @@ from tensorflow.keras.models import load_model
 import paths # utils/paths.py
 from model import dice_coefficient, DiceMetric
 
-MODEL_PATH = Path('benchmark') / 'octa_model.keras'
+MODEL_PATH = Path('benchmark') / 'segmentation_best.keras'
 
 IMG_VALID_DIR = Path('data') / 'processed' / 'images' / 'valid'
 MASK_VALID_DIR = Path('data') / 'processed' / 'masks' / 'valid'
