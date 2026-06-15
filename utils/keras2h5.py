@@ -1,6 +1,9 @@
 import sys
 from pathlib import Path
 
+
+"""HOW TO GENERATE config.json and metadata.json as was done in earlier file version?"""
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path: sys.path.append(str(ROOT_DIR))
 
@@ -15,6 +18,10 @@ H5_OUT      = 'models/segmentation_best.h5'
 # ── Step 1: Extract weights ───────────────────────────────────────────────────
 with zipfile.ZipFile(KERAS_PATH, 'r') as z:
     z.extract('model.weights.h5', 'models/_extracted/')
+    z.extract('config.json', EXTRACT_DIR)
+    z.extract('metadata.json', EXTRACT_DIR)
+    print(f"│   ├── Saved layout specs → {CONFIG_JSON}")
+    print(f"│   └── Saved training run records → {METADATA_JSON}")
 
 # ── Step 2: Rebuild architecture (same code that trained it) ──────────────────
 model = build_segmentation_model()
