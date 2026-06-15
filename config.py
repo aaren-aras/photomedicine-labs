@@ -38,6 +38,7 @@ GEO_AUG = { # stage 2: segmentation
 LOSS_ALPHA = 1 # L2/pixel loss weight [*]
 LOSS_BETA = 0.01 # VGG19/perceptual loss weight [*]
 SMOOTH = 1 # avoid dividing by 0 for Dice classes (namely for earlier gradients)
+THRESHOLD = 0.5 # cutoff probability above which a px is classified as a vessel
 SKELETON_ITERS = 5 # ~OCTA-500 vessel half-width in px
 FILTERS = (16, 32, 64, 128) # counts per encoder stage (↑ this ⇒ ↑ vessel detail, ↑ overfitting)
 KERNEL_SIZE = 3 # filter size for skeleton erosion and square matrix convolution in px 
@@ -46,7 +47,7 @@ DROPOUT_RATE = 0.3 # % neurons zeroed at bottleneck and decoder stages to preven
 
 # ── Optimizer ── 
 LEARNING_RATE = 1e-4 # small gradient steps for fine-tuning on sparser vessel structures [*]
-EPSILON = 1e-8 # avoid dividing by 0 for clDice and float32 on small gradients
+EPSILON = 1e-8 # avoid dividing by 0 for clDice, float32 on small gradients, test metrics
 ADAM_BETA1 = 0.8 # momentum: forget gradient history faster [*]
 ADAM_BETA2 = 0.999 # step size confidence: go slower on bigger gradients [*]
 LR_DECAY_FACTOR = 0.95 # prevent oscillation in late training for near-min loss [*]
