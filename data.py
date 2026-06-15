@@ -1,6 +1,6 @@
 """
-Preprocesses OCTA-500 and ROSE datasets into uint8 numpy arrays,
-with the following directory structure expected:
+Preprocesses OCTA-500 and ROSE datasets into uint8 numpy 
+arrays, with the following directory structure expected:
 
 data/
     OCTA-500/
@@ -15,7 +15,6 @@ data/
                 original/
                 gt/
 """
-
 from pathlib import Path
 import json
 
@@ -32,7 +31,7 @@ from config import (
 
 ROOT_DIR = Path(__file__).resolve().parent
 ROSE_DIR = ROOT_DIR / 'data' / 'ROSE'
-OUTPUT_DIR = ROOT_DIR / 'data' / 'processed2'
+OUTPUT_DIR = ROOT_DIR / 'data' / 'processed'
 
 for split in ['train', 'valid', 'test']:
     (OUTPUT_DIR / 'images' / split).mkdir(parents=True, exist_ok=True)
@@ -160,7 +159,7 @@ def save_sample(img: np.ndarray, mask: np.ndarray, sample_id: str, split: str) -
 
 def prepare_data(use_rose: bool = True) -> None:
     """
-    Processes projections and corresponding labels for model training,
+    Preprocesses projections and corresponding labels for model training,
     reserving OCTA-500 as the held-out benchmark for testing with splits 
     of similar proportions to literature (Giarratano et al. 2020).
     """
