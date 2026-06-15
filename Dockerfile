@@ -1,4 +1,6 @@
-# Run 'docker compose up --build' from project root
+# Run 'docker compose up --build' from project root to run the full pipeline
+# Use 'docker compose run --entrypoint python pipeline {filename}' to run files separately
+
 # Uses NVIDIA NGC container for GPU-accelerated training
 FROM nvcr.io/nvidia/tensorflow:25.02-tf2-py3
 
