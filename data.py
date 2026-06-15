@@ -207,7 +207,7 @@ def prepare_data(use_rose: bool = True) -> None:
     print(f'  Train: {len(all_train)}, Valid: {len(all_valid)}, Test: {len(all_test)}')
     print(f'Vessel ratio: mean of {np.mean(ratios)*100:.1f}%, ' # rounded to 1 decimal
         f'range of {np.min(ratios)*100:.1f}–{np.max(ratios)*100:.1f}%')
-    print(f'Class imbalance: {1/np.mean(ratios):.0f}:1' # rounded to nearest whole
+    print(f'Class imbalance ~ {1/np.mean(ratios):.0f}:1 ' # rounded to nearest whole
         f'background:vessel pixel ratio (correctable with Dice loss)') 
 
 
