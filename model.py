@@ -2,7 +2,6 @@
 2-stage ResU-Net CNN pipeline for OCTA image restoration followed by vessel segmentation,
 trained on augmented OCTA-500 and ROSE data, based loosely on Liao et al. setup (see docs). 
 """
-
 from pathlib import Path
 from typing import Generator
 import random
@@ -44,7 +43,7 @@ if gpus:
     print(f'*TF CUDA COMPUTE CAPABILITIES: {cuda_compute_capabilities}')
     print(f'*GPUs FOUND: {gpus[0].name}')
 else:
-    print('*WARNING: No GPU found. Training will begin on CPU, but it\'ll be slower...')
+    print('*WARNING: No GPU found. Training will begin on CPU...')
 
 
 def count_files(directory: Path) -> int:
