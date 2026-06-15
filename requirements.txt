@@ -1,7 +1,5 @@
-"""
-Versions are tailored to NGC container and Python 3.12. DON'T use 
-.venv or 'pip install -r requirements.txt' on Windows (see Dockerfile).
-"""
+# Versions are tailored to Python 3.12 and the NGC container. DON'T use  
+# .venv or 'pip install -r requirements.txt' on Windows (see Dockerfile).
 PyQt5>=5.15.10             
 tensorflow==2.17.0 # matches NGC container
 keras>=3.0.0 # TF 2.17 uses Keras 3.x
@@ -12,5 +10,5 @@ scikit-learn>=1.5.2
 imgaug==0.4.0            
 opencv-python-headless>=4.9.0.80 
 tqdm>=4.66.4             
-nibabel>=5.2.0 # works with Python 3.12
+nibabel>=5.2.0 
 pillow>=10.3.0      
