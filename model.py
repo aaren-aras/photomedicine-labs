@@ -16,11 +16,11 @@ from tensorflow.keras.callbacks import (
 from tensorflow.keras.regularizers import l2
 
 from config import (
-    IMG_SIZE, NUM_CLASSES, LOSS_ALPHA, LOSS_BETA, SMOOTH, SKELETON_ITERS,
-    FILTERS, KERNEL_SIZE, SCALE_FACTOR, DROPOUT_RATE, DROPOUT_SEVERITY, 
-    LEARNING_RATE, EPSILON, ADAM_BETA1, ADAM_BETA2, LR_DECAY_FACTOR, 
-    LR_DECAY_STEPS, BATCH_SIZE, BCE_WEIGHT, GEO_AUG, MOTION_AUG, 
-    EPOCHS, EARLY_STOP_PATIENCE, GAUSSIAN_NOISE_SIGMA
+    IMG_SIZE, NUM_CLASSES, LOSS_ALPHA, LOSS_BETA, SMOOTH, THRESHOLD,
+    SKELETON_ITERS, FILTERS, KERNEL_SIZE, SCALE_FACTOR, DROPOUT_RATE, 
+    DROPOUT_SEVERITY, LEARNING_RATE, EPSILON, ADAM_BETA1, ADAM_BETA2, 
+    LR_DECAY_FACTOR, LR_DECAY_STEPS, BATCH_SIZE, BCE_WEIGHT, GEO_AUG, 
+    MOTION_AUG, EPOCHS, EARLY_STOP_PATIENCE, GAUSSIAN_NOISE_SIGMA
 )
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -401,9 +401,8 @@ class DiceMetric(tf.keras.metrics.Metric):
         self.count = self.add_weight(name='count', initializer='zeros')
 
     def update_state(self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight=None) -> None:
-        # Flips pixel probabilities >50% to vessels (1.0)
         self.dice_sum.assign_add(
-            dice_coefficient(y_true, tf.cast(y_pred > 0.5, tf.float32))
+            dice_coefficient(y_true, tf.cast(y_pred > THRESHOLD, tf.float32))
         )
         self.count.assign_add(1.0)
 
@@ -425,8 +424,7 @@ class IoUMetric(tf.keras.metrics.Metric):
         self.count   = self.add_weight(name='iou_count', initializer='zeros')
 
     def update_state(self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight=None) -> None:
-        # Flips pixel probabilities >50% to vessels (1.0)
-        y_binarized = tf.cast(y_pred > 0.5, tf.float32)
+        y_binarized = tf.cast(y_pred > THRESHOLD, tf.float32)
 
         # Flattens (4, H, W, 1) into 1D columns
         yt = tf.reshape(tf.cast(y_true, tf.float32), [-1])
@@ -448,8 +446,8 @@ class IoUMetric(tf.keras.metrics.Metric):
 
 def build_segmentation_model() -> Model:
     """
-    ResU-Net for binary vessel segmentation, with loss computed as 
-    Dice + ω x BCE, where ω=0.3.
+    ResU-Net for binary vessel segmentation, with loss 
+    computed as Dice + ω x BCE, where ω=0.3.
     """
     inputs = tf.keras.Input(shape=(*IMG_SIZE, 1))
 
@@ -570,8 +568,7 @@ def segmentation_generator(
 
                 if augment:
                     img_uint8 = (img * 255).astype(np.uint8) # imgaug needs uint8 [0, 255]
-                    mask_binary = (mask > 0.5).astype(np.uint8) # flips pixel prob > 50% to vessels (1.0)
-
+                    mask_binary = (mask > THRESHOLD).astype(np.uint8) 
                     # Ensure image and mask get same transformations per pair
                     segmap = SegmentationMapsOnImage(mask_binary.squeeze(), shape=img.shape) # (H, W, 1) -> (H, W)
                     aug_img, aug_seg = seq(image=img_uint8, segmentation_maps=segmap)
