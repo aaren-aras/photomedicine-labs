@@ -1,6 +1,7 @@
 # PhotoMedicine Labs
 
-This repo contains some code for neural networks trained to perform image processing on retinal angiograms, developed as part of an **Undergraduate Research Assistantship** with PhotoMedicine Labs. 
+This repository has code for neural networks trained to perform image restoration and segmentation on retinal angiograms, developed as part of an **Undergraduate Research Assistantship** with PhotoMedicine Labs. 
+
 It uses a 2-stage ResU-Net architecture and includes an accompanying desktop app for targeted OCTA scanning via galvo-mirror region-of-interest (ROI) selection. Reproducible scripts for motion artifact simulation, dataset augmentation, and structural evaluation are also provided.
 
 ---
