@@ -1,9 +1,8 @@
 # PhotoMedicine Labs
 
-2-stage ResU-Net pipeline for optical coherence tomography angiography (OCTA) image restoration 
-followed by vessel segmentation, and a PyQt5 GUI for galvo mirror ROI selection and waveform export.
-
-**Undergraduate Research Assistant @ PhotoMedicine Labs, Jan–Apr 2026**
+This repo contains some code for an end-to-end deep learning pipeline for retinal microvascular restoration and segmentation, developed as part of an **Undergraduate Research Assistantship** with PhotoMedicine Labs. It uses a 2-stage ResU-Net architecture and includes a desktop app made for 
+targeted OCTA scanning via galvo-mirror region-of-interest (ROI) selection. Reproducible scripts 
+for motion artifact simulation, dataset augmentation, and structural evaluation are also provided.
 
 ---
 
