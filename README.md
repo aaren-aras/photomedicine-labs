@@ -1,8 +1,7 @@
 # PhotoMedicine Labs
 
-This repo contains some code for an end-to-end deep learning pipeline for retinal microvascular restoration and segmentation, developed as part of an **Undergraduate Research Assistantship** with PhotoMedicine Labs. It uses a 2-stage ResU-Net architecture and includes a desktop app made for 
-targeted OCTA scanning via galvo-mirror region-of-interest (ROI) selection. Reproducible scripts 
-for motion artifact simulation, dataset augmentation, and structural evaluation are also provided.
+This repo contains some code for neural networks trained to perform image processing on retinal angiograms, developed as part of an **Undergraduate Research Assistantship** with PhotoMedicine Labs. 
+It uses a 2-stage ResU-Net architecture and includes an accompanying desktop app for targeted OCTA scanning via galvo-mirror region-of-interest (ROI) selection. Reproducible scripts for motion artifact simulation, dataset augmentation, and structural evaluation are also provided.
 
 ---
 
@@ -13,7 +12,7 @@ for motion artifact simulation, dataset augmentation, and structural evaluation 
 pip install PyQt5 numpy matplotlib opencv-python tensorflow-cpu==2.17.0 \
             tf-keras imgaug scikit-learn tqdm
 
-# 1. Preprocess datasets → .npy arrays
+# 1. Preprocess datasets
 python data.py
 
 # 2. Train (GPU, inside Docker)
@@ -146,7 +145,7 @@ Gaussian noise σ=0.4 added after physics simulation (Liao §4.1) — simulates 
 | PSNR | Pixel fidelity (dB), higher = better | ~20–21 dB | 24.2 dB | 15.7 dB |
 | SSIM | Perceptual quality [0,1], higher = better | ~0.79 | 0.59 | 0.28 |
 
-Both well above the degraded input baseline. Gap vs Liao is expected — they trained on real 2-repeat vs 12-repeat paired data from their own SS-OCT system. We simulate degradation on clean OCTA-500 images. **The path to closing this gap is Andrei's microfluidic channel paired data** → retrain on real acquisition noise.
+Both well above the degraded input baseline. Gap vs Liao is expected — they trained on real 2-repeat vs 12-repeat paired data from their own SS-OCT system. We simulate degradation on clean OCTA-500 images. 
 
 ---
 
@@ -230,11 +229,11 @@ Giarratano 2020 benchmark (OCTA-500 large vessel): Dice 0.80–0.85. We exceed i
 
 ## GUI (`gui/`)
 
-PyQt5 desktop app bridging the segmentation pipeline with Andrei's OCT galvo hardware. Loads any OCTA image, drag-to-draw ROI, instantly computes galvo voltage sub-ranges. Segmentation runs **locally on CPU** from the saved `.keras` file — no Docker, no GPU required. ~1 second inference per image.
+PyQt5 desktop app bridging the segmentation pipeline with OCT galvo hardware. Loads any OCTA image, drag-to-draw ROI, instantly computes galvo voltage sub-ranges. Segmentation runs **locally on CPU** from the saved `.keras` file — no Docker, no GPU required. ~1 second inference per image.
 
 ### Galvo voltage mapping
 
-Andrei's OCT system drives X/Y galvo mirrors with voltage waveforms. Full FOV = X: 0→2V, Y: 0→2V. An ROI pixel sub-region maps proportionally:
+OCT system drives X/Y galvo mirrors with voltage waveforms. Full FOV = X: 0→2V, Y: 0→2V. An ROI pixel sub-region maps proportionally:
 
 ```
 voltage = v_min + (px / img_size) × (v_max - v_min)
@@ -327,9 +326,9 @@ Pre-training assertions: shape == (400,400), dtype == uint8, image values in [0,
 
 ## Next Steps
 
-- **Andrei's microfluidic paired data** — acquire real low-repeat vs high-repeat OCTA scan pairs from the in-lab SS-OCT system. Single largest path to closing the PSNR gap vs Liao (24.2 dB).
+- **Microfluidic paired data** — acquire real low-repeat vs high-repeat OCTA scan pairs from the in-lab SS-OCT system. Single largest path to closing the PSNR gap vs Liao (24.2 dB).
 - **Cascade fine-tuning** — fine-tune Stage 2 on Stage 1's outputs from real degraded data. Currently stages train independently on clean OCTA-500.
-- **Chicken embryo transfer** — apply pipeline to Andrei's chicken embryo B-scans. Compute speckle variance OCTA, then restore → segment. Fine-tune segmentation on manually annotated embryo vessel regions.
+- **Chicken embryo transfer** — apply pipeline to chicken embryo B-scans. Compute speckle variance OCTA, then restore → segment. Fine-tune segmentation on manually annotated embryo vessel regions.
 - **Liao hyperparameter ablation on retinal OCTA** — β=0.01 and `block5_conv4` were ablated on skin OCTA. Ideally re-run on retinal OCTA to confirm optimality for this domain.
 
 ---
